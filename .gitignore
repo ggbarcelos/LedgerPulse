@@ -1,0 +1,31 @@
+# macOS
+.DS_Store
+
+# Build outputs
+**/bin/
+**/obj/
+
+# Test artifacts
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
+# User-specific files
+*.user
+*.suo
+*.userosscache
+*.rsuser
+
+# Logs
+*.log
+
+# JetBrains Rider / IntelliJ
+.idea/
+*.sln.iml
+
+# Node / frontend tooling (if generated locally)
+node_modules/
+wwwroot/dist/
+
+AGENTS.md

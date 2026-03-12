@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/LedgerPulse.Api/LedgerPulse.Api.csproj" />
+    <Project Path="src/LedgerPulse.Application/LedgerPulse.Application.csproj" />
+    <Project Path="src/LedgerPulse.ConsolidationWorker/LedgerPulse.ConsolidationWorker.csproj" />
+    <Project Path="src/LedgerPulse.Domain/LedgerPulse.Domain.csproj" />
+    <Project Path="src/LedgerPulse.Frontend/LedgerPulse.Frontend.csproj" />
+    <Project Path="src/LedgerPulse.Infrastructure/LedgerPulse.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/LedgerPulse.IntegrationTests/LedgerPulse.IntegrationTests.csproj" />
+    <Project Path="tests/LedgerPulse.UnitTests/LedgerPulse.UnitTests.csproj" />
+  </Folder>
+</Solution>

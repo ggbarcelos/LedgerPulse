@@ -1,0 +1,21 @@
+@page "/"
+
+<PageTitle>LedgerPulse</PageTitle>
+
+<h1>LedgerPulse</h1>
+
+<p>Base inicial do desafio com monolito modular, Outbox Pattern, worker dedicado e frontend em Blazor WASM.</p>
+
+<h2>Bounded Contexts</h2>
+<ul>
+    <li><strong>Ledger</strong>: registra e lista lancamentos.</li>
+    <li><strong>DailyConsolidation</strong>: expoe os consolidados diarios materializados.</li>
+</ul>
+
+<h2>Fluxo principal</h2>
+<ol>
+    <li>Um lancamento entra pela API de Ledger.</li>
+    <li>O evento e persistido na Outbox.</li>
+    <li>O worker processa a mensagem pendente.</li>
+    <li>O consolidado diario e atualizado de forma assincrona.</li>
+</ol>
