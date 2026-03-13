@@ -1,5 +1,6 @@
 using LedgerPulse.Application.Abstractions.Messaging;
 using LedgerPulse.Application.DailyConsolidation.Services;
+using LedgerPulse.Api.Security;
 
 namespace LedgerPulse.Api.Endpoints;
 
@@ -16,10 +17,12 @@ public static class DailyConsolidationEndpoints
         });
 
         group.MapPost("/process", async (IOutboxProcessor outboxProcessor, CancellationToken cancellationToken) =>
-        {
-            var result = await outboxProcessor.ProcessPendingMessagesAsync(cancellationToken);
-            return Results.Ok(result);
-        });
+            {
+                var result = await outboxProcessor.ProcessPendingMessagesAsync(cancellationToken);
+                return Results.Ok(result);
+            })
+            .RequireRateLimiting("ConsolidationProcess")
+            .AddEndpointFilter<ApiKeyEndpointFilter>();
 
         return endpoints;
     }

@@ -1,5 +1,6 @@
 using LedgerPulse.Application.Ledger.Dtos;
 using LedgerPulse.Application.Ledger.Services;
+using LedgerPulse.Api.Security;
 
 namespace LedgerPulse.Api.Endpoints;
 
@@ -16,10 +17,12 @@ public static class LedgerEndpoints
         });
 
         group.MapPost("/entries", async (RegisterLedgerEntryRequest request, ILedgerEntryService ledgerEntryService, CancellationToken cancellationToken) =>
-        {
-            var createdEntry = await ledgerEntryService.CreateAsync(request, cancellationToken);
-            return Results.Created($"/api/ledger/entries/{createdEntry.Id}", createdEntry);
-        });
+            {
+                var createdEntry = await ledgerEntryService.CreateAsync(request, cancellationToken);
+                return Results.Created($"/api/ledger/entries/{createdEntry.Id}", createdEntry);
+            })
+            .RequireRateLimiting("LedgerWrite")
+            .AddEndpointFilter<ApiKeyEndpointFilter>();
 
         return endpoints;
     }

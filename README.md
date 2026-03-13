@@ -70,6 +70,8 @@ Servicos expostos:
 - Frontend: `http://localhost:8082`
 - PostgreSQL: `localhost:5432`
 
+No ambiente Docker, o frontend publica a aplicacao em `http://localhost:8082` e encaminha chamadas de `/api/*` para o servico `api` via nginx. Assim, o browser acessa frontend e API pela mesma origem visivel ao usuario.
+
 Credenciais padrao do banco:
 
 - Database: `ledgerpulse`
@@ -87,6 +89,7 @@ dotnet run --project src/LedgerPulse.Frontend
 ```
 
 A API e o worker usam por padrao a string de conexao local para PostgreSQL em `localhost:5432`.
+Ao rodar sem Docker, o frontend usa `http://localhost:5020/` como base da API e a API libera CORS explicitamente para a origem `http://localhost:5262`.
 
 ## Endpoints principais
 
@@ -94,6 +97,11 @@ A API e o worker usam por padrao a string de conexao local para PostgreSQL em `l
 
 - `GET /api/ledger/entries`
 - `POST /api/ledger/entries`
+
+Os endpoints `POST` exigem o header `X-Api-Key` quando `ApiSecurity:ApiKey` estiver configurado (valor padrao de desenvolvimento: `ledgerpulse-dev-key`).
+
+O endpoint de escrita aplica rate limiting com janela fixa para reduzir impacto de picos.
+Os valores podem ser configurados em `RateLimiting:LedgerWrite` (`PermitLimit`, `WindowSeconds`, `QueueLimit`), com padrao de desenvolvimento ajustado para pico proximo de 50 rps.
 
 Exemplo de payload:
 
@@ -110,6 +118,9 @@ Exemplo de payload:
 
 - `GET /api/daily-consolidation/summaries`
 - `POST /api/daily-consolidation/process`
+
+O endpoint `POST /process` tambem exige `X-Api-Key` e possui rate limiting dedicado para evitar execucoes manuais em excesso.
+Os valores desse endpoint ficam em `RateLimiting:ConsolidationProcess`.
 
 O endpoint `process` permite disparar manualmente o processamento da Outbox, embora o worker ja execute esse trabalho em background.
 
