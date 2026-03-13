@@ -1,3 +1,4 @@
+using System.Data;
 using System.Text.Json;
 using LedgerPulse.Application.Abstractions.Messaging;
 using LedgerPulse.Application.DailyConsolidation.Dtos;
@@ -74,18 +75,50 @@ public sealed class OutboxProcessor(LedgerPulseDbContext dbContext) : IOutboxPro
     {
         if (dbContext.Database.IsNpgsql())
         {
-            var acquired = await dbContext.Database
-                .SqlQueryRaw<bool>("SELECT pg_try_advisory_lock({0})", ProcessingLockKey)
-                .SingleAsync(cancellationToken);
+            var connection = dbContext.Database.GetDbConnection();
+            var shouldCloseConnection = connection.State != ConnectionState.Open;
+            if (shouldCloseConnection)
+            {
+                await dbContext.Database.OpenConnectionAsync(cancellationToken);
+            }
+
+            await using var acquireCommand = connection.CreateCommand();
+            acquireCommand.CommandText = "SELECT pg_try_advisory_lock(@lockKey)";
+
+            var lockParameter = acquireCommand.CreateParameter();
+            lockParameter.ParameterName = "@lockKey";
+            lockParameter.Value = ProcessingLockKey;
+            acquireCommand.Parameters.Add(lockParameter);
+
+            var acquireResult = await acquireCommand.ExecuteScalarAsync(cancellationToken);
+            var acquired = acquireResult is true;
 
             if (!acquired)
             {
+                if (shouldCloseConnection)
+                {
+                    await dbContext.Database.CloseConnectionAsync();
+                }
+
                 return null;
             }
 
             return new AsyncDisposableAction(async () =>
             {
-                await dbContext.Database.ExecuteSqlRawAsync("SELECT pg_advisory_unlock({0})", [ProcessingLockKey]);
+                await using var releaseCommand = connection.CreateCommand();
+                releaseCommand.CommandText = "SELECT pg_advisory_unlock(@lockKey)";
+
+                var releaseParameter = releaseCommand.CreateParameter();
+                releaseParameter.ParameterName = "@lockKey";
+                releaseParameter.Value = ProcessingLockKey;
+                releaseCommand.Parameters.Add(releaseParameter);
+
+                await releaseCommand.ExecuteScalarAsync();
+
+                if (shouldCloseConnection)
+                {
+                    await dbContext.Database.CloseConnectionAsync();
+                }
             });
         }
 
