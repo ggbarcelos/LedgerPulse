@@ -16,13 +16,16 @@ public static class DailyConsolidationEndpoints
             return Results.Ok(summaries);
         });
 
-        group.MapPost("/process", async (IOutboxProcessor outboxProcessor, CancellationToken cancellationToken) =>
+        var internalGroup = endpoints.MapGroup("/internal/daily-consolidation").WithTags("DailyConsolidation.Internal");
+
+        internalGroup.MapPost("/process", async (IOutboxProcessor outboxProcessor, CancellationToken cancellationToken) =>
             {
                 var result = await outboxProcessor.ProcessPendingMessagesAsync(cancellationToken);
                 return Results.Ok(result);
             })
             .RequireRateLimiting("ConsolidationProcess")
-            .AddEndpointFilter<ApiKeyEndpointFilter>();
+            .RequireApiKey("ApiSecurity:ConsolidationProcessApiKey", "ConsolidationProcess")
+            .ExcludeFromDescription();
 
         return endpoints;
     }

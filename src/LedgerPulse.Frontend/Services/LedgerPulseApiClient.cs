@@ -24,12 +24,4 @@ public sealed class LedgerPulseApiClient(HttpClient httpClient)
         var response = await httpClient.GetFromJsonAsync<List<DailyLedgerSummaryViewModel>>("api/daily-consolidation/summaries", cancellationToken);
         return response ?? [];
     }
-
-    public async Task<OutboxProcessingResultViewModel> ProcessOutboxAsync(CancellationToken cancellationToken = default)
-    {
-        var response = await httpClient.PostAsync("api/daily-consolidation/process", content: null, cancellationToken);
-        response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<OutboxProcessingResultViewModel>(cancellationToken)
-            ?? throw new InvalidOperationException("The API response did not contain the processing result.");
-    }
 }

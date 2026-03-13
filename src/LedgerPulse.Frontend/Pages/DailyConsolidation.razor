@@ -5,13 +5,7 @@
 
 <h1>Daily Consolidation</h1>
 
-<button class="btn btn-primary me-2" @onclick="ProcessAsync">Process Pending Outbox Messages</button>
 <button class="btn btn-secondary" @onclick="LoadSummariesAsync">Refresh Summaries</button>
-
-@if (!string.IsNullOrWhiteSpace(_message))
-{
-    <p class="mt-3">@_message</p>
-}
 
 @if (_summaries.Count == 0)
 {
@@ -44,17 +38,9 @@ else
 
 @code {
     private List<DailyLedgerSummaryViewModel> _summaries = [];
-    private string? _message;
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadSummariesAsync();
-    }
-
-    private async Task ProcessAsync()
-    {
-        var result = await ApiClient.ProcessOutboxAsync();
-        _message = $"Processed {result.ProcessedMessages} messages and ignored {result.IgnoredMessages}.";
         await LoadSummariesAsync();
     }
 

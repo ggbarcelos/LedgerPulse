@@ -80,6 +80,13 @@ Credenciais padrao do banco:
 
 ## Como rodar localmente sem Docker
 
+Opcionalmente, defina chaves distintas para os endpoints de escrita e operacao manual:
+
+```bash
+export ApiSecurity__LedgerWriteApiKey="ledger-write-local-key"
+export ApiSecurity__ConsolidationProcessApiKey="consolidation-process-local-key"
+```
+
 Em terminais separados:
 
 ```bash
@@ -98,10 +105,16 @@ Ao rodar sem Docker, o frontend usa `http://localhost:5020/` como base da API e 
 - `GET /api/ledger/entries`
 - `POST /api/ledger/entries`
 
-Os endpoints `POST` exigem o header `X-Api-Key` quando `ApiSecurity:ApiKey` estiver configurado (valor padrao de desenvolvimento: `ledgerpulse-dev-key`).
+Os endpoints `POST` exigem o header `X-Api-Key` apenas quando suas respectivas chaves estiverem configuradas:
+
+- `POST /api/ledger/entries` -> `ApiSecurity:LedgerWriteApiKey`
+- `POST /internal/daily-consolidation/process` -> `ApiSecurity:ConsolidationProcessApiKey`
+
+As chaves devem ser fornecidas por variaveis de ambiente (nao ficam versionadas no frontend).
 
 O endpoint de escrita aplica rate limiting com janela fixa para reduzir impacto de picos.
 Os valores podem ser configurados em `RateLimiting:LedgerWrite` (`PermitLimit`, `WindowSeconds`, `QueueLimit`), com padrao de desenvolvimento ajustado para pico proximo de 50 rps.
+Ha tambem um limite global por IP em `RateLimiting:Global` para reduzir abuso da superficie publica.
 
 Exemplo de payload:
 
@@ -117,12 +130,12 @@ Exemplo de payload:
 ### DailyConsolidation
 
 - `GET /api/daily-consolidation/summaries`
-- `POST /api/daily-consolidation/process`
+- `POST /internal/daily-consolidation/process` (operacional/interno)
 
-O endpoint `POST /process` tambem exige `X-Api-Key` e possui rate limiting dedicado para evitar execucoes manuais em excesso.
+O endpoint `POST /internal/daily-consolidation/process` usa chave dedicada (`ApiSecurity:ConsolidationProcessApiKey`) e possui rate limiting para evitar execucoes manuais em excesso.
 Os valores desse endpoint ficam em `RateLimiting:ConsolidationProcess`.
 
-O endpoint `process` permite disparar manualmente o processamento da Outbox, embora o worker ja execute esse trabalho em background.
+O trigger manual da consolidacao foi removido da superficie publica `/api/*` e mantido apenas em rota interna para operacao.
 
 ## Testes e validacao
 

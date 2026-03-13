@@ -3,6 +3,7 @@
 ```mermaid
 sequenceDiagram
     participant Client
+    participant Ops as Operations
     participant API as Ledger API
     participant DB as PostgreSQL
     participant Worker as Consolidation Worker
@@ -14,4 +15,5 @@ sequenceDiagram
     Worker->>DB: Read pending OutboxMessages
     Worker->>Daily: Apply consolidation logic
     Worker->>DB: Save DailyLedgerSummary + mark processed
+    Ops->>API: POST /internal/daily-consolidation/process
 ```

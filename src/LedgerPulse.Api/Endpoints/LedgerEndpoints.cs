@@ -22,7 +22,7 @@ public static class LedgerEndpoints
                 return Results.Created($"/api/ledger/entries/{createdEntry.Id}", createdEntry);
             })
             .RequireRateLimiting("LedgerWrite")
-            .AddEndpointFilter<ApiKeyEndpointFilter>();
+            .RequireApiKey("ApiSecurity:LedgerWriteApiKey", "LedgerWrite");
 
         return endpoints;
     }

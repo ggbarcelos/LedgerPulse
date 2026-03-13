@@ -15,6 +15,9 @@ builder.Services.AddProblemDetails();
 builder.Services.AddScoped<ApiKeyEndpointFilter>();
 builder.Services.AddRateLimiter(options =>
 {
+    var globalPermitLimit = builder.Configuration.GetValue<int?>("RateLimiting:Global:PermitLimit") ?? 120;
+    var globalWindowSeconds = builder.Configuration.GetValue<int?>("RateLimiting:Global:WindowSeconds") ?? 1;
+
     var ledgerWritePermitLimit = builder.Configuration.GetValue<int?>("RateLimiting:LedgerWrite:PermitLimit") ?? 55;
     var ledgerWriteWindowSeconds = builder.Configuration.GetValue<int?>("RateLimiting:LedgerWrite:WindowSeconds") ?? 1;
     var ledgerWriteQueueLimit = builder.Configuration.GetValue<int?>("RateLimiting:LedgerWrite:QueueLimit") ?? 5;
@@ -24,6 +27,28 @@ builder.Services.AddRateLimiter(options =>
     var processQueueLimit = builder.Configuration.GetValue<int?>("RateLimiting:ConsolidationProcess:QueueLimit") ?? 2;
 
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = Math.Max(1, globalPermitLimit),
+                Window = TimeSpan.FromSeconds(Math.Max(1, globalWindowSeconds)),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+    options.OnRejected = (context, _) =>
+    {
+        var logger = context.HttpContext.RequestServices
+            .GetRequiredService<ILoggerFactory>()
+            .CreateLogger("RateLimiting");
+        logger.LogWarning(
+            "Rate limit rejected request for {Method} {Path} from {RemoteIp}.",
+            context.HttpContext.Request.Method,
+            context.HttpContext.Request.Path,
+            context.HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown");
+        return ValueTask.CompletedTask;
+    };
 
     options.AddFixedWindowLimiter("LedgerWrite", limiterOptions =>
     {
@@ -50,8 +75,8 @@ builder.Services.AddCors(options =>
         {
             policy
                 .WithOrigins(allowedOrigins)
-                .AllowAnyHeader()
-                .AllowAnyMethod();
+                .WithMethods("GET", "POST", "OPTIONS")
+                .WithHeaders("Content-Type", "X-Api-Key");
         }
     });
 });
