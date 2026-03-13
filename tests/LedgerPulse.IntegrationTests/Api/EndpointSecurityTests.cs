@@ -7,6 +7,7 @@ using LedgerPulse.Application.DailyConsolidation.Dtos;
 using LedgerPulse.Application.DailyConsolidation.Services;
 using LedgerPulse.Application.Ledger.Dtos;
 using LedgerPulse.Application.Ledger.Services;
+using LedgerPulse.Domain.Ledger;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.RateLimiting;
@@ -25,7 +26,7 @@ public sealed class EndpointSecurityTests
 
         var response = await startedApp.Client.PostAsJsonAsync(
             "/api/ledger/entries",
-            new RegisterLedgerEntryRequest("Payment", 10m, "BRL", new DateOnly(2026, 3, 12)));
+            new RegisterLedgerEntryRequest("Payment", 10m, LedgerEntryType.Credit, new DateOnly(2026, 3, 12)));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -38,7 +39,7 @@ public sealed class EndpointSecurityTests
 
         var response = await startedApp.Client.PostAsJsonAsync(
             "/api/ledger/entries",
-            new RegisterLedgerEntryRequest("Payment", 10m, "BRL", new DateOnly(2026, 3, 12)));
+            new RegisterLedgerEntryRequest("Payment", 10m, LedgerEntryType.Credit, new DateOnly(2026, 3, 12)));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -51,7 +52,7 @@ public sealed class EndpointSecurityTests
 
         var response = await startedApp.Client.PostAsJsonAsync(
             "/api/ledger/entries",
-            new RegisterLedgerEntryRequest("Payment", 10m, "BRL", new DateOnly(2026, 3, 12)));
+            new RegisterLedgerEntryRequest("Payment", 10m, LedgerEntryType.Credit, new DateOnly(2026, 3, 12)));
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
@@ -140,7 +141,7 @@ public sealed class EndpointSecurityTests
                 request.BusinessDate ?? DateOnly.FromDateTime(DateTime.UtcNow),
                 request.Description,
                 request.Amount,
-                request.Currency,
+                request.EntryType,
                 DateTime.UtcNow));
         }
 

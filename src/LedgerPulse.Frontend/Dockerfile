@@ -5,5 +5,7 @@ RUN dotnet publish src/LedgerPulse.Frontend/LedgerPulse.Frontend.csproj -c Relea
 
 FROM nginx:alpine AS final
 COPY src/LedgerPulse.Frontend/nginx.conf /etc/nginx/conf.d/default.conf
+COPY src/LedgerPulse.Frontend/wait-for-api.sh /docker-entrypoint.d/30-wait-for-api.sh
+RUN chmod +x /docker-entrypoint.d/30-wait-for-api.sh
 COPY --from=build /app/publish/wwwroot /usr/share/nginx/html
 EXPOSE 80

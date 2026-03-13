@@ -9,7 +9,7 @@ public sealed class LedgerEntryService(ILedgerEntryRepository ledgerEntryReposit
     public async Task<LedgerEntryResponse> CreateAsync(RegisterLedgerEntryRequest request, CancellationToken cancellationToken)
     {
         var businessDate = request.BusinessDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
-        var ledgerEntry = LedgerEntry.Create(businessDate, request.Description, request.Amount, request.Currency);
+        var ledgerEntry = LedgerEntry.Create(businessDate, request.Description, request.Amount, request.EntryType);
 
         await ledgerEntryRepository.AddAsync(ledgerEntry, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -19,7 +19,7 @@ public sealed class LedgerEntryService(ILedgerEntryRepository ledgerEntryReposit
             ledgerEntry.BusinessDate,
             ledgerEntry.Description,
             ledgerEntry.Amount,
-            ledgerEntry.Currency,
+            ledgerEntry.EntryType,
             ledgerEntry.CreatedAtUtc);
     }
 
@@ -27,7 +27,7 @@ public sealed class LedgerEntryService(ILedgerEntryRepository ledgerEntryReposit
     {
         var ledgerEntries = await ledgerEntryRepository.ListAsync(cancellationToken);
         return ledgerEntries
-            .Select(entry => new LedgerEntryResponse(entry.Id, entry.BusinessDate, entry.Description, entry.Amount, entry.Currency, entry.CreatedAtUtc))
+            .Select(entry => new LedgerEntryResponse(entry.Id, entry.BusinessDate, entry.Description, entry.Amount, entry.EntryType, entry.CreatedAtUtc))
             .ToArray();
     }
 }

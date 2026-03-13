@@ -1,4 +1,5 @@
 using LedgerPulse.Domain.Common;
+using LedgerPulse.Domain.Ledger;
 using LedgerPulse.Domain.Ledger.Events;
 
 namespace LedgerPulse.Domain.Ledger.Entities;
@@ -17,20 +18,25 @@ public sealed class LedgerEntry : Entity
 
     public decimal Amount { get; private set; }
 
-    public string Currency { get; private set; } = string.Empty;
+    public LedgerEntryType EntryType { get; private set; }
 
     public DateTime CreatedAtUtc { get; private set; }
 
-    public static LedgerEntry Create(DateOnly businessDate, string description, decimal amount, string currency)
+    public static LedgerEntry Create(DateOnly businessDate, string description, decimal amount, LedgerEntryType entryType)
     {
         if (string.IsNullOrWhiteSpace(description))
         {
             throw new ArgumentException("Description is required.", nameof(description));
         }
 
-        if (string.IsNullOrWhiteSpace(currency) || currency.Trim().Length != 3)
+        if (amount <= 0)
         {
-            throw new ArgumentException("Currency must contain 3 characters.", nameof(currency));
+            throw new ArgumentOutOfRangeException(nameof(amount), "Amount must be greater than zero.");
+        }
+
+        if (entryType is LedgerEntryType.Unknown)
+        {
+            throw new ArgumentException("Entry type is required.", nameof(entryType));
         }
 
         var entry = new LedgerEntry
@@ -39,11 +45,11 @@ public sealed class LedgerEntry : Entity
             BusinessDate = businessDate,
             Description = description.Trim(),
             Amount = amount,
-            Currency = currency.Trim().ToUpperInvariant(),
+            EntryType = entryType,
             CreatedAtUtc = DateTime.UtcNow
         };
 
-        entry.RaiseDomainEvent(new LedgerEntryRegisteredDomainEvent(entry.Id, entry.BusinessDate, entry.Amount, entry.Currency));
+        entry.RaiseDomainEvent(new LedgerEntryRegisteredDomainEvent(entry.Id, entry.BusinessDate, entry.Amount, entry.EntryType));
         return entry;
     }
 }

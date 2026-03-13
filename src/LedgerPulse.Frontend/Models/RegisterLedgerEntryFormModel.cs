@@ -1,19 +1,19 @@
 using System.ComponentModel.DataAnnotations;
+using LedgerPulse.Domain.Ledger;
+using LedgerPulse.Frontend.Validation;
 
 namespace LedgerPulse.Frontend.Models;
 
 public sealed class RegisterLedgerEntryFormModel
 {
-    [Required]
-    [StringLength(120)]
+    [Required(ErrorMessage = "A descricao e obrigatoria.")]
+    [StringLength(120, ErrorMessage = "A descricao deve ter no maximo 120 caracteres.")]
     public string Description { get; set; } = string.Empty;
 
-    [Range(typeof(decimal), "-999999999", "999999999")]
+    [PositiveAmount(ErrorMessage = "O valor deve ser maior que zero.")]
     public decimal Amount { get; set; }
 
-    [Required]
-    [StringLength(3, MinimumLength = 3)]
-    public string Currency { get; set; } = "BRL";
+    public LedgerEntryType EntryType { get; set; } = LedgerEntryType.Credit;
 
     public DateOnly BusinessDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
 }

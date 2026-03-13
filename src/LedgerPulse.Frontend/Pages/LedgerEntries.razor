@@ -1,69 +1,122 @@
 @page "/ledger-entries"
+@implements IDisposable
 @inject LedgerPulseApiClient ApiClient
+@using LedgerPulse.Domain.Ledger
+@using System.Globalization
+@using System.Net.Http
+@using System.Text.Json
+@using System.Threading
 
-<PageTitle>Ledger Entries</PageTitle>
+<PageTitle>Lancamentos</PageTitle>
 
-<h1>Ledger Entries</h1>
+<h1>Lancamentos</h1>
 
 <EditForm Model="_form" OnValidSubmit="SubmitAsync">
     <DataAnnotationsValidator />
     <ValidationSummary />
 
     <div class="mb-3">
-        <label class="form-label">Description</label>
+        <label class="form-label">Descricao</label>
         <InputText class="form-control" @bind-Value="_form.Description" />
     </div>
 
     <div class="mb-3">
-        <label class="form-label">Amount</label>
-        <InputNumber class="form-control" @bind-Value="_form.Amount" />
+        <label class="form-label">Valor</label>
+        <input class="form-control" inputmode="decimal" placeholder="0,00" value="@_amountInput" @oninput="OnAmountInput" />
     </div>
 
     <div class="mb-3">
-        <label class="form-label">Currency</label>
-        <InputText class="form-control" @bind-Value="_form.Currency" />
+        <label class="form-label">Tipo de lancamento</label>
+        <InputSelect class="form-select" @bind-Value="_form.EntryType">
+            <option value="@LedgerEntryType.Credit">Credito</option>
+            <option value="@LedgerEntryType.Debit">Debito</option>
+        </InputSelect>
     </div>
 
     <div class="mb-3">
-        <label class="form-label">Business Date</label>
-        <InputDate class="form-control" @bind-Value="_form.BusinessDate" />
+        <label class="form-label">Data de negocio</label>
+        <div class="ledger-date-picker">
+            <button class="form-control ledger-date-picker__trigger"
+                    type="button"
+                    @onclick="ToggleCalendar">
+                <span>@_form.BusinessDate.ToString("dd/MM/yyyy", PtBrCulture)</span>
+                <span aria-hidden="true">📅</span>
+            </button>
+
+            @if (_isCalendarOpen)
+            {
+                <div class="ledger-date-picker__panel">
+                    <div class="ledger-date-picker__header">
+                        <button class="btn btn-sm btn-outline-secondary"
+                                type="button"
+                                @onclick="ShowPreviousMonth">
+                            &lt;
+                        </button>
+
+                        <strong>@_displayMonth.ToString("MMMM 'de' yyyy", PtBrCulture)</strong>
+
+                        <button class="btn btn-sm btn-outline-secondary"
+                                type="button"
+                                @onclick="ShowNextMonth">
+                            &gt;
+                        </button>
+                    </div>
+
+                    <div class="ledger-date-picker__weekdays">
+                        @foreach (var dayName in _calendarDayNames)
+                        {
+                            <span>@dayName</span>
+                        }
+                    </div>
+
+                    <div class="ledger-date-picker__grid">
+                        @foreach (var day in GetCalendarDays())
+                        {
+                            <button class="@GetCalendarDayClass(day)"
+                                    type="button"
+                                    @onclick="() => SelectBusinessDate(day.Date)">
+                                @day.Date.Day
+                            </button>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
     </div>
 
-    <button class="btn btn-primary" type="submit">Register Entry</button>
+    <button class="btn btn-primary" type="submit">Registrar lancamento</button>
 </EditForm>
 
-@if (!string.IsNullOrWhiteSpace(_message))
+@if (!string.IsNullOrWhiteSpace(_feedbackMessage))
 {
-    <p class="mt-3">@_message</p>
+    <div class="alert @(_hasError ? "alert-danger" : "alert-success") mt-3" role="alert">@_feedbackMessage</div>
 }
-
-<button class="btn btn-secondary mt-3 mb-3" @onclick="LoadEntriesAsync">Refresh</button>
 
 @if (_entries.Count == 0)
 {
-    <p>No entries were found.</p>
+    <p>Nenhum lancamento foi encontrado.</p>
 }
 else
 {
     <table class="table">
         <thead>
             <tr>
-                <th>Business Date</th>
-                <th>Description</th>
-                <th>Amount</th>
-                <th>Currency</th>
-                <th>Created At</th>
+                <th>Data de negocio</th>
+                <th>Descricao</th>
+                <th>Valor</th>
+                <th>Tipo</th>
+                <th>Criado em</th>
             </tr>
         </thead>
         <tbody>
             @foreach (var entry in _entries)
             {
                 <tr>
-                    <td>@entry.BusinessDate</td>
+                    <td>@entry.BusinessDate.ToString("dd/MM/yyyy", PtBrCulture)</td>
                     <td>@entry.Description</td>
-                    <td>@entry.Amount</td>
-                    <td>@entry.Currency</td>
-                    <td>@entry.CreatedAtUtc.ToLocalTime()</td>
+                    <td>@entry.Amount.ToString("N2", PtBrCulture)</td>
+                    <td>@GetEntryTypeLabel(entry.EntryType)</td>
+                    <td>@entry.CreatedAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm", PtBrCulture)</td>
                 </tr>
             }
         </tbody>
@@ -71,9 +124,17 @@ else
 }
 
 @code {
+    private static readonly TimeSpan SuccessFeedbackDuration = TimeSpan.FromSeconds(4);
+    private static readonly CultureInfo PtBrCulture = CultureInfo.GetCultureInfo("pt-BR");
+    private static readonly string[] _calendarDayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
     private RegisterLedgerEntryFormModel _form = new();
     private List<LedgerEntryViewModel> _entries = [];
-    private string? _message;
+    private string _amountInput = string.Empty;
+    private string? _feedbackMessage;
+    private bool _hasError;
+    private bool _isCalendarOpen;
+    private DateOnly _displayMonth = new(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private CancellationTokenSource? _feedbackDismissalTokenSource;
 
     protected override async Task OnInitializedAsync()
     {
@@ -82,14 +143,204 @@ else
 
     private async Task SubmitAsync()
     {
-        await ApiClient.CreateLedgerEntryAsync(new RegisterLedgerEntryRequestModel(_form.Description, _form.Amount, _form.Currency, _form.BusinessDate));
-        _message = "Ledger entry registered successfully.";
-        _form = new RegisterLedgerEntryFormModel();
-        await LoadEntriesAsync();
+        ClearFeedback();
+
+        try
+        {
+            var createdEntry = await ApiClient.CreateLedgerEntryAsync(
+                new RegisterLedgerEntryRequestModel(_form.Description, _form.Amount, _form.EntryType, _form.BusinessDate));
+            ShowSuccess("Lancamento registrado com sucesso.");
+            AddOrUpdateEntry(createdEntry);
+            _form = new RegisterLedgerEntryFormModel();
+            _amountInput = string.Empty;
+            _displayMonth = new DateOnly(_form.BusinessDate.Year, _form.BusinessDate.Month, 1);
+            _isCalendarOpen = false;
+        }
+        catch (HttpRequestException)
+        {
+            SetError("Nao foi possivel registrar o lancamento. Verifique se a API esta disponivel.");
+        }
+        catch (JsonException)
+        {
+            SetError("Nao foi possivel registrar o lancamento porque a resposta da API veio em formato invalido.");
+        }
+        catch (InvalidOperationException ex)
+        {
+            SetError($"Nao foi possivel registrar o lancamento. {ex.Message}");
+        }
     }
 
     private async Task LoadEntriesAsync()
     {
-        _entries = (await ApiClient.GetLedgerEntriesAsync()).ToList();
+        try
+        {
+            _entries = (await ApiClient.GetLedgerEntriesAsync()).ToList();
+        }
+        catch (HttpRequestException)
+        {
+            _entries = [];
+            SetError("Nao foi possivel carregar os lancamentos. Verifique se a API esta disponivel.");
+        }
+        catch (JsonException)
+        {
+            _entries = [];
+            SetError("Nao foi possivel carregar os lancamentos porque a resposta da API veio em formato invalido.");
+        }
+        catch (InvalidOperationException ex)
+        {
+            _entries = [];
+            SetError($"Nao foi possivel carregar os lancamentos. {ex.Message}");
+        }
     }
+
+    private static string GetEntryTypeLabel(LedgerEntryType entryType)
+        => entryType switch
+        {
+            LedgerEntryType.Credit => "Credito",
+            LedgerEntryType.Debit => "Debito",
+            _ => "Nao informado"
+        };
+
+    private void AddOrUpdateEntry(LedgerEntryViewModel entry)
+    {
+        _entries = _entries
+            .Where(existingEntry => existingEntry.Id != entry.Id)
+            .Append(entry)
+            .OrderByDescending(existingEntry => existingEntry.BusinessDate)
+            .ThenByDescending(existingEntry => existingEntry.CreatedAtUtc)
+            .ToList();
+    }
+
+    private void OnAmountInput(ChangeEventArgs args)
+    {
+        var rawValue = args.Value?.ToString() ?? string.Empty;
+        var digits = new string(rawValue.Where(char.IsDigit).ToArray());
+
+        if (string.IsNullOrEmpty(digits))
+        {
+            _amountInput = string.Empty;
+            _form.Amount = 0;
+            return;
+        }
+
+        var parsedValue = decimal.Parse(digits, CultureInfo.InvariantCulture) / 100m;
+        _form.Amount = parsedValue;
+        _amountInput = parsedValue.ToString("N2", PtBrCulture);
+    }
+
+    private void ToggleCalendar()
+    {
+        _isCalendarOpen = !_isCalendarOpen;
+    }
+
+    private void ShowPreviousMonth()
+    {
+        _displayMonth = _displayMonth.AddMonths(-1);
+    }
+
+    private void ShowNextMonth()
+    {
+        _displayMonth = _displayMonth.AddMonths(1);
+    }
+
+    private void SelectBusinessDate(DateOnly businessDate)
+    {
+        _form.BusinessDate = businessDate;
+        _displayMonth = new DateOnly(businessDate.Year, businessDate.Month, 1);
+        _isCalendarOpen = false;
+    }
+
+    private IReadOnlyList<CalendarDay> GetCalendarDays()
+    {
+        var firstDayOfMonth = new DateOnly(_displayMonth.Year, _displayMonth.Month, 1);
+        var startDate = firstDayOfMonth.AddDays(-(int)firstDayOfMonth.DayOfWeek);
+
+        return Enumerable.Range(0, 42)
+            .Select(offset =>
+            {
+                var date = startDate.AddDays(offset);
+                return new CalendarDay(date, date.Month == _displayMonth.Month);
+            })
+            .ToArray();
+    }
+
+    private string GetCalendarDayClass(CalendarDay day)
+    {
+        var classes = new List<string> { "ledger-date-picker__day" };
+
+        if (!day.IsCurrentMonth)
+        {
+            classes.Add("ledger-date-picker__day--muted");
+        }
+
+        if (day.Date == _form.BusinessDate)
+        {
+            classes.Add("ledger-date-picker__day--selected");
+        }
+
+        if (day.Date == DateOnly.FromDateTime(DateTime.Today))
+        {
+            classes.Add("ledger-date-picker__day--today");
+        }
+
+        return string.Join(" ", classes);
+    }
+
+    private void ClearFeedback()
+    {
+        CancelFeedbackDismissal();
+        _feedbackMessage = null;
+        _hasError = false;
+    }
+
+    private void SetError(string message)
+    {
+        CancelFeedbackDismissal();
+        _feedbackMessage = message;
+        _hasError = true;
+    }
+
+    private void ShowSuccess(string message)
+    {
+        CancelFeedbackDismissal();
+        _feedbackMessage = message;
+        _hasError = false;
+
+        _feedbackDismissalTokenSource = new CancellationTokenSource();
+        _ = DismissSuccessFeedbackAsync(_feedbackDismissalTokenSource.Token);
+    }
+
+    private async Task DismissSuccessFeedbackAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(SuccessFeedbackDuration, cancellationToken);
+            await InvokeAsync(() =>
+            {
+                if (!_hasError)
+                {
+                    _feedbackMessage = null;
+                }
+
+                StateHasChanged();
+            });
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private void CancelFeedbackDismissal()
+    {
+        _feedbackDismissalTokenSource?.Cancel();
+        _feedbackDismissalTokenSource?.Dispose();
+        _feedbackDismissalTokenSource = null;
+    }
+
+    public void Dispose()
+    {
+        CancelFeedbackDismissal();
+    }
+
+    private sealed record CalendarDay(DateOnly Date, bool IsCurrentMonth);
 }

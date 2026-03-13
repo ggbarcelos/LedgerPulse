@@ -1,0 +1,65 @@
+.ledger-date-picker {
+    position: relative;
+}
+
+.ledger-date-picker__trigger {
+    align-items: center;
+    background: #fff;
+    display: flex;
+    justify-content: space-between;
+    text-align: left;
+}
+
+.ledger-date-picker__panel {
+    background: #fff;
+    border: 1px solid #ced4da;
+    border-radius: 0.375rem;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    margin-top: 0.5rem;
+    padding: 0.75rem;
+    position: absolute;
+    width: 20rem;
+    z-index: 20;
+}
+
+.ledger-date-picker__header {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+}
+
+.ledger-date-picker__weekdays,
+.ledger-date-picker__grid {
+    display: grid;
+    gap: 0.25rem;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.ledger-date-picker__weekdays {
+    color: #6c757d;
+    font-size: 0.85rem;
+    margin-bottom: 0.35rem;
+    text-align: center;
+}
+
+.ledger-date-picker__day {
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    min-height: 2.25rem;
+}
+
+.ledger-date-picker__day--muted {
+    color: #adb5bd;
+}
+
+.ledger-date-picker__day--today {
+    border-color: #1b6ec2;
+}
+
+.ledger-date-picker__day--selected {
+    background: #1b6ec2;
+    border-color: #1b6ec2;
+    color: #fff;
+}

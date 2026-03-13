@@ -1,35 +1,47 @@
 @page "/daily-consolidation"
+@implements IAsyncDisposable
 @inject LedgerPulseApiClient ApiClient
+@using System.Globalization
+@using System.Net.Http
+@using System.Text.Json
+@using System.Threading
 
-<PageTitle>Daily Consolidation</PageTitle>
+<PageTitle>Consolidacao Diaria</PageTitle>
 
-<h1>Daily Consolidation</h1>
+<h1>Consolidacao Diaria</h1>
 
-<button class="btn btn-secondary" @onclick="LoadSummariesAsync">Refresh Summaries</button>
+@if (!string.IsNullOrWhiteSpace(_errorMessage))
+{
+    <div class="alert alert-danger mt-3" role="alert">@_errorMessage</div>
+}
 
 @if (_summaries.Count == 0)
 {
-    <p class="mt-3">No consolidated data available yet.</p>
+    <p class="mt-3">Ainda nao ha dados consolidados disponiveis.</p>
 }
 else
 {
     <table class="table mt-3">
         <thead>
             <tr>
-                <th>Business Date</th>
-                <th>Total Amount</th>
-                <th>Entry Count</th>
-                <th>Updated At</th>
+                <th>Data de negocio</th>
+                <th>Total de creditos</th>
+                <th>Total de debitos</th>
+                <th>Saldo do dia</th>
+                <th>Quantidade de lancamentos</th>
+                <th>Atualizado em</th>
             </tr>
         </thead>
         <tbody>
             @foreach (var summary in _summaries)
             {
                 <tr>
-                    <td>@summary.BusinessDate</td>
-                    <td>@summary.TotalAmount</td>
+                    <td>@summary.BusinessDate.ToString("dd/MM/yyyy", PtBrCulture)</td>
+                    <td>@summary.TotalCredits.ToString("N2", PtBrCulture)</td>
+                    <td>@summary.TotalDebits.ToString("N2", PtBrCulture)</td>
+                    <td>@summary.Balance.ToString("N2", PtBrCulture)</td>
                     <td>@summary.EntryCount</td>
-                    <td>@summary.UpdatedAtUtc.ToLocalTime()</td>
+                    <td>@summary.UpdatedAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm", PtBrCulture)</td>
                 </tr>
             }
         </tbody>
@@ -37,15 +49,84 @@ else
 }
 
 @code {
+    private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(5);
+    private static readonly CultureInfo PtBrCulture = CultureInfo.GetCultureInfo("pt-BR");
+    private readonly CancellationTokenSource _refreshCancellationTokenSource = new();
     private List<DailyLedgerSummaryViewModel> _summaries = [];
+    private PeriodicTimer? _refreshTimer;
+    private string? _errorMessage;
+    private bool _isLoading;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadSummariesAsync();
+        _refreshTimer = new PeriodicTimer(RefreshInterval);
+        _ = RunAutoRefreshAsync(_refreshCancellationTokenSource.Token);
     }
 
     private async Task LoadSummariesAsync()
     {
-        _summaries = (await ApiClient.GetDailySummariesAsync()).ToList();
+        if (_isLoading)
+        {
+            return;
+        }
+
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            _summaries = (await ApiClient.GetDailySummariesAsync()).ToList();
+        }
+        catch (HttpRequestException)
+        {
+            _summaries = [];
+            _errorMessage = "Nao foi possivel carregar a consolidacao diaria. Verifique se a API esta disponivel.";
+        }
+        catch (JsonException)
+        {
+            _summaries = [];
+            _errorMessage = "Nao foi possivel carregar a consolidacao diaria porque a resposta da API veio em formato invalido.";
+        }
+        catch (InvalidOperationException ex)
+        {
+            _summaries = [];
+            _errorMessage = $"Nao foi possivel carregar a consolidacao diaria. {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task RunAutoRefreshAsync(CancellationToken cancellationToken)
+    {
+        if (_refreshTimer is null)
+        {
+            return;
+        }
+
+        try
+        {
+            while (await _refreshTimer.WaitForNextTickAsync(cancellationToken))
+            {
+                await InvokeAsync(async () =>
+                {
+                    await LoadSummariesAsync();
+                    StateHasChanged();
+                });
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        _refreshCancellationTokenSource.Cancel();
+        _refreshTimer?.Dispose();
+        _refreshCancellationTokenSource.Dispose();
+        return ValueTask.CompletedTask;
     }
 }

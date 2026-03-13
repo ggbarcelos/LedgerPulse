@@ -12,7 +12,8 @@ public sealed class DailyLedgerSummaryConfiguration : IEntityTypeConfiguration<D
         builder.HasKey(summary => summary.Id);
         builder.HasIndex(summary => summary.BusinessDate).IsUnique();
         builder.Property(summary => summary.BusinessDate).IsRequired();
-        builder.Property(summary => summary.TotalAmount).HasColumnType("numeric(18,2)");
+        builder.Property(summary => summary.TotalCredits).HasColumnType("numeric(18,2)");
+        builder.Property(summary => summary.TotalDebits).HasColumnType("numeric(18,2)");
         builder.Property(summary => summary.EntryCount).IsRequired();
         builder.Property(summary => summary.UpdatedAtUtc).IsRequired();
     }

@@ -1,3 +1,5 @@
+using LedgerPulse.Domain.Ledger;
+
 namespace LedgerPulse.Application.Ledger.Dtos;
 
-public sealed record LedgerEntryResponse(Guid Id, DateOnly BusinessDate, string Description, decimal Amount, string Currency, DateTime CreatedAtUtc);
+public sealed record LedgerEntryResponse(Guid Id, DateOnly BusinessDate, string Description, decimal Amount, LedgerEntryType EntryType, DateTime CreatedAtUtc);

@@ -4,6 +4,7 @@ using LedgerPulse.Application.Abstractions.Messaging;
 using LedgerPulse.Application.DailyConsolidation.Dtos;
 using LedgerPulse.Application.IntegrationEvents;
 using LedgerPulse.Domain.DailyConsolidation.Entities;
+using LedgerPulse.Domain.Ledger;
 using LedgerPulse.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -51,7 +52,15 @@ public sealed class OutboxProcessor(LedgerPulseDbContext dbContext) : IOutboxPro
                         dbContext.DailyLedgerSummaries.Add(summary);
                     }
 
-                    summary.ApplyEntry(integrationEvent.Amount, DateTime.UtcNow);
+                    var effectiveEntryType = integrationEvent.EntryType switch
+                    {
+                        LedgerEntryType.Credit => LedgerEntryType.Credit,
+                        LedgerEntryType.Debit => LedgerEntryType.Debit,
+                        _ when integrationEvent.Amount < 0 => LedgerEntryType.Debit,
+                        _ => LedgerEntryType.Credit
+                    };
+
+                    summary.ApplyEntry(effectiveEntryType, Math.Abs(integrationEvent.Amount), DateTime.UtcNow);
                     message.MarkProcessed(DateTime.UtcNow);
                     processedMessages += 1;
                     continue;

@@ -1,4 +1,5 @@
 using LedgerPulse.Domain.Ledger.Entities;
+using LedgerPulse.Domain.Ledger;
 using LedgerPulse.Application.IntegrationEvents;
 using LedgerPulse.Infrastructure.Messaging;
 using LedgerPulse.Infrastructure.Persistence;
@@ -16,7 +17,7 @@ public sealed class OutboxProcessorTests
             .Options;
 
         await using var dbContext = new LedgerPulseDbContext(options);
-        var ledgerEntry = LedgerEntry.Create(new DateOnly(2026, 3, 12), "Invoice payment", 150m, "BRL");
+        var ledgerEntry = LedgerEntry.Create(new DateOnly(2026, 3, 12), "Invoice payment", 150m, LedgerEntryType.Credit);
 
         dbContext.LedgerEntries.Add(ledgerEntry);
         await dbContext.SaveChangesAsync();
@@ -29,7 +30,9 @@ public sealed class OutboxProcessorTests
 
         Assert.Equal(1, result.ProcessedMessages);
         Assert.Equal(0, result.IgnoredMessages);
-        Assert.Equal(150m, summary.TotalAmount);
+        Assert.Equal(150m, summary.TotalCredits);
+        Assert.Equal(0m, summary.TotalDebits);
+        Assert.Equal(150m, summary.Balance);
         Assert.Equal(1, summary.EntryCount);
         Assert.NotNull(outboxMessage.ProcessedOnUtc);
     }
@@ -69,7 +72,7 @@ public sealed class OutboxProcessorTests
 
         await using (var seedContext = new LedgerPulseDbContext(options))
         {
-            seedContext.LedgerEntries.Add(LedgerEntry.Create(new DateOnly(2026, 3, 12), "Concurrent payment", 200m, "BRL"));
+            seedContext.LedgerEntries.Add(LedgerEntry.Create(new DateOnly(2026, 3, 12), "Concurrent payment", 200m, LedgerEntryType.Debit));
             await seedContext.SaveChangesAsync();
         }
 
@@ -86,7 +89,9 @@ public sealed class OutboxProcessorTests
         await using var assertContext = new LedgerPulseDbContext(options);
         var summary = await assertContext.DailyLedgerSummaries.SingleAsync();
 
-        Assert.Equal(200m, summary.TotalAmount);
+        Assert.Equal(0m, summary.TotalCredits);
+        Assert.Equal(200m, summary.TotalDebits);
+        Assert.Equal(-200m, summary.Balance);
         Assert.Equal(1, summary.EntryCount);
     }
 }

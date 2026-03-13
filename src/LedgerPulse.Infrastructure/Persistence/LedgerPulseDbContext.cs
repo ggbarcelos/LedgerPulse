@@ -70,7 +70,7 @@ public sealed class LedgerPulseDbContext(DbContextOptions<LedgerPulseDbContext> 
             domainEvent.LedgerEntryId,
             domainEvent.BusinessDate,
             domainEvent.Amount,
-            domainEvent.Currency,
+            domainEvent.EntryType,
             domainEvent.OccurredOnUtc);
 
         return OutboxMessage.Create(

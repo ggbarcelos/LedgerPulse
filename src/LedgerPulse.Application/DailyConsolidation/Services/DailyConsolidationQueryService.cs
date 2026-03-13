@@ -9,7 +9,13 @@ public sealed class DailyConsolidationQueryService(IDailyLedgerSummaryRepository
     {
         var summaries = await summaryRepository.ListAsync(cancellationToken);
         return summaries
-            .Select(summary => new DailyLedgerSummaryResponse(summary.BusinessDate, summary.TotalAmount, summary.EntryCount, summary.UpdatedAtUtc))
+            .Select(summary => new DailyLedgerSummaryResponse(
+                summary.BusinessDate,
+                summary.TotalCredits,
+                summary.TotalDebits,
+                summary.Balance,
+                summary.EntryCount,
+                summary.UpdatedAtUtc))
             .ToArray();
     }
 }
