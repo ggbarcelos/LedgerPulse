@@ -63,14 +63,12 @@ Esse desenho preserva a disponibilidade do fluxo de lancamentos mesmo quando a c
 Na raiz do projeto, execute:
 
 ```bash
-cd /Users/banana/Documents/Projetos/GotoMobi/LedgerPulse
 docker compose up --build -d
 ```
 
 Se voce quiser acompanhar os logs em primeiro plano:
 
 ```bash
-cd /Users/banana/Documents/Projetos/GotoMobi/LedgerPulse
 docker compose up --build
 ```
 
@@ -88,7 +86,6 @@ O container do frontend aguarda a API responder em `/health` antes de concluir a
 Se voce quiser validar o projeto como ambiente virgem, removendo banco e dados persistidos:
 
 ```bash
-cd /Users/banana/Documents/Projetos/GotoMobi/LedgerPulse
 docker compose down -v
 docker compose up --build -d
 ```
@@ -106,6 +103,8 @@ Credenciais padrao do banco:
 - Password: `postgres`
 
 ## Como rodar localmente sem Docker
+
+Na primeira execucao sem Docker, **nenhuma variavel de ambiente precisa ser definida**: as chaves de seguranca estao vazias por padrao, e a API ignora a validacao do header quando a chave nao esta configurada.
 
 Opcionalmente, defina chaves distintas para os endpoints de escrita e operacao manual:
 
@@ -163,7 +162,7 @@ Observacoes sobre o payload:
 - `description`: texto livre do lancamento.
 - `amount`: valor decimal positivo enviado para a API sem mascara, por exemplo `1250.40`.
 - `entryType`: aceita `Credit` ou `Debit`.
-- `businessDate`: deve ser enviada para a API em formato ISO `yyyy-MM-dd`, por exemplo `2026-03-12`.
+- `businessDate`: opcional; deve ser enviada no formato ISO `yyyy-MM-dd`, por exemplo `2026-03-12`. Quando omitida, o sistema usa a data atual em UTC.
 
 Observacao sobre a interface:
 
@@ -181,6 +180,21 @@ Valores aceitos em `entryType`:
 - `Credit`
 - `Debit`
 
+Exemplo de resposta do `GET /api/ledger/entries`:
+
+```json
+[
+  {
+    "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "businessDate": "2026-03-12",
+    "description": "Venda no cartao",
+    "amount": 1250.40,
+    "entryType": "Credit",
+    "createdAtUtc": "2026-03-12T14:30:00Z"
+  }
+]
+```
+
 ### DailyConsolidation
 
 - `GET /api/daily-consolidation/summaries`
@@ -188,6 +202,7 @@ Valores aceitos em `entryType`:
 
 Cada item retornado em `GET /api/daily-consolidation/summaries` informa:
 
+- `businessDate`
 - `totalCredits`
 - `totalDebits`
 - `balance`
@@ -213,6 +228,18 @@ O endpoint `POST /internal/daily-consolidation/process` usa chave dedicada (`Api
 Os valores desse endpoint ficam em `RateLimiting:ConsolidationProcess`.
 
 O trigger manual da consolidacao foi removido da superficie publica `/api/*` e mantido apenas em rota interna para operacao.
+
+Exemplo de resposta do `POST /internal/daily-consolidation/process`:
+
+```json
+{
+  "processedMessages": 3,
+  "ignoredMessages": 0
+}
+```
+
+- `processedMessages`: quantidade de mensagens da Outbox aplicadas com sucesso ao consolidado diario.
+- `ignoredMessages`: quantidade de mensagens com tipo desconhecido, marcadas como processadas sem retry.
 
 ## Testes e validacao
 
